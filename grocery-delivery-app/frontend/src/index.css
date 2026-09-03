@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-leaf-900: #1a3327;
+  --color-leaf-700: #2d5a3d;
+  --color-leaf-500: #3f7a54;
+  --color-leaf-100: #e3ede6;
+
+  --color-tomato-600: #d64933;
+  --color-tomato-500: #e8593f;
+
+  --color-turmeric-500: #e8a317;
+  --color-turmeric-400: #f0b93f;
+
+  --color-kraft-100: #f4f0e6;
+  --color-kraft-200: #ede6d6;
+  --color-kraft-300: #e0d5bd;
+
+  --color-ink-900: #1a1a1a;
+  --color-ink-600: #4a4740;
+
+  --font-display: 'Fraunces', serif;
+  --font-body: 'Work Sans', sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-kraft-100);
+    color: var(--color-ink-900);
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+  }
+}
