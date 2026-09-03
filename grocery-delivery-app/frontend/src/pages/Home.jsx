@@ -35,10 +35,13 @@ export default function Home() {
       }
 
       const { data } = await api.get('/products', { params });
-      setProducts(data.products || []);
+      // Safely ensure data is an array regardless of API response shape
+      const items = Array.isArray(data) ? data : data?.products || [];
+      setProducts(items);
       setError('');
     } catch (err) {
       setError('Failed to load groceries. Please ensure the backend is running.');
+      setProducts([]); // Fallback to empty array on fetch failure
       console.error(err);
     } finally {
       setLoading(false);
@@ -120,7 +123,7 @@ export default function Home() {
             </div>
           ))}
         </div>
-      ) : products.length === 0 ? (
+      ) : (!products || products.length === 0) ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-kraft-300">
           <span className="text-5xl">🧺</span>
           <h3 className="font-display font-semibold text-xl text-ink-900 mt-4">No products found</h3>
@@ -137,7 +140,7 @@ export default function Home() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((product) => (
+          {products?.map((product) => (
             <ProductCard key={product._id} product={product} />
           ))}
         </div>
@@ -145,4 +148,3 @@ export default function Home() {
     </div>
   );
 }
-
