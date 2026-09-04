@@ -35,13 +35,12 @@ export default function Home() {
       }
 
       const { data } = await api.get('/products', { params });
-      // Safely ensure data is an array regardless of API response shape
       const items = Array.isArray(data) ? data : data?.products || [];
       setProducts(items);
       setError('');
     } catch (err) {
       setError('Failed to load groceries. Please ensure the backend is running.');
-      setProducts([]); // Fallback to empty array on fetch failure
+      setProducts([]);
       console.error(err);
     } finally {
       setLoading(false);
@@ -51,7 +50,7 @@ export default function Home() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Hero Banner */}
-      <div className="bg-gradient-to-r from-leaf-700 to-leaf-900 text-white rounded-2xl p-8 md:p-12 mb-10 shadow-sm relative overflow-hidden">
+      <div className="bg-linear-to-r from-leaf-700 to-leaf-900 text-white rounded-2xl p-8 md:p-12 mb-10 shadow-sm relative overflow-hidden">
         <div className="max-w-xl relative z-10">
           <span className="bg-leaf-500/40 text-leaf-100 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
             Fast Local Delivery • Cash on Delivery
