@@ -4,12 +4,23 @@ import api from '../api/axios';
 const CATEGORIES = ['fruits', 'vegetables', 'dairy', 'bakery', 'meat', 'beverages', 'snacks', 'household', 'other'];
 const STATUSES = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
 
+const emptyForm = {
+  name: '',
+  description: '',
+  category: 'fruits',
+  price: '',
+  unit: 'kg',
+  stock: '',
+  image: '',
+  rating: '',
+};
+
 export default function AdminDashboard() {
   const [tab, setTab] = useState('products');
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', description: '', category: 'fruits', price: '', unit: 'kg', stock: '' });
+  const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
 
@@ -33,14 +44,19 @@ export default function AdminDashboard() {
   };
 
   const resetForm = () => {
-    setForm({ name: '', description: '', category: 'fruits', price: '', unit: 'kg', stock: '' });
+    setForm(emptyForm);
     setEditingId(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
-    const payload = { ...form, price: Number(form.price), stock: Number(form.stock) };
+    const payload = {
+      ...form,
+      price: Number(form.price),
+      stock: Number(form.stock),
+      rating: form.rating === '' ? 0 : Number(form.rating),
+    };
     try {
       if (editingId) {
         await api.put(`/products/${editingId}`, payload);
@@ -65,6 +81,8 @@ export default function AdminDashboard() {
       price: product.price,
       unit: product.unit,
       stock: product.stock,
+      image: product.image || '',
+      rating: product.rating ?? '',
     });
     setTab('products');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -116,6 +134,18 @@ export default function AdminDashboard() {
               name="description" placeholder="Description" required value={form.description} onChange={handleFormChange}
               className="w-full border border-kraft-300 rounded px-3 py-2 text-sm" rows={2}
             />
+            <input
+              name="image" placeholder="Image URL" value={form.image} onChange={handleFormChange}
+              className="w-full border border-kraft-300 rounded px-3 py-2 text-sm"
+            />
+            {form.image && (
+              <img
+                src={form.image}
+                alt="Preview"
+                className="w-full h-32 object-cover rounded border border-kraft-300"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            )}
             <select name="category" value={form.category} onChange={handleFormChange} className="w-full border border-kraft-300 rounded px-3 py-2 text-sm">
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -129,10 +159,16 @@ export default function AdminDashboard() {
                 className="w-full border border-kraft-300 rounded px-3 py-2 text-sm"
               />
             </div>
-            <input
-              name="stock" type="number" placeholder="Stock" required value={form.stock} onChange={handleFormChange}
-              className="w-full border border-kraft-300 rounded px-3 py-2 text-sm"
-            />
+            <div className="flex gap-2">
+              <input
+                name="stock" type="number" placeholder="Stock" required value={form.stock} onChange={handleFormChange}
+                className="w-full border border-kraft-300 rounded px-3 py-2 text-sm"
+              />
+              <input
+                name="rating" type="number" step="0.1" min="0" max="5" placeholder="Rating (0-5)" value={form.rating} onChange={handleFormChange}
+                className="w-full border border-kraft-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
             {message && <p className="text-sm text-leaf-700">{message}</p>}
             <div className="flex gap-2">
               <button type="submit" className="flex-1 bg-tomato-600 hover:bg-tomato-500 text-white py-2 rounded text-sm font-medium">
@@ -148,10 +184,19 @@ export default function AdminDashboard() {
 
           <div className="md:col-span-2 space-y-2">
             {products.map((p) => (
-              <div key={p._id} className="bg-white rounded-lg p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{p.name}</p>
-                  <p className="text-sm text-ink-600">${p.price} / {p.unit} &middot; {p.stock} in stock &middot; {p.category}</p>
+              <div key={p._id} className="bg-white rounded-lg p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={p.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=100'}
+                    alt={p.name}
+                    className="w-12 h-12 object-cover rounded border border-kraft-200"
+                  />
+                  <div>
+                    <p className="font-medium">{p.name}</p>
+                    <p className="text-sm text-ink-600">
+                      ₹{p.price} / {p.unit} &middot; {p.stock} in stock &middot; {p.category} &middot; ⭐ {p.rating || 0}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-2 text-sm">
                   <button onClick={() => startEdit(p)} className="px-3 py-1.5 border border-kraft-300 rounded">Edit</button>
@@ -172,7 +217,7 @@ export default function AdminDashboard() {
                 <div>
                   <p className="font-medium">Order #{o._id.slice(-6)} &mdash; {o.user?.name}</p>
                   <p className="text-sm text-ink-600">
-                    {o.items.length} item(s) &middot; ${o.totalPrice.toFixed(2)} &middot; {o.paymentMethod.toUpperCase()}
+                    {o.items.length} item(s) &middot; ₹{o.totalPrice.toFixed(2)} &middot; {o.paymentMethod.toUpperCase()}
                   </p>
                 </div>
                 <select
