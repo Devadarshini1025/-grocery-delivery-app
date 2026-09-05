@@ -12,6 +12,7 @@ const createOrder = async (req, res, next) => {
       itemsPrice = 0,
       deliveryFee = 0,
       shippingPrice = 0,
+      discount = 0,
       totalPrice = 0,
     } = req.body;
 
@@ -32,6 +33,7 @@ const createOrder = async (req, res, next) => {
       paymentMethod: 'Cash on Delivery (COD)',
       itemsPrice,
       deliveryFee: deliveryFee || shippingPrice,
+      discount,
       totalPrice,
       isPaid: false, // Collected in cash upon delivery
       paidAt: null,

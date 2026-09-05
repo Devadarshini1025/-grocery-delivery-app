@@ -9,8 +9,11 @@ const CartContext = createContext({
   clearCart: () => {},
   itemsPrice: 0,
   deliveryFee: 0,
+  discount: 0,
   totalPrice: 0,
   totalCount: 0,
+  freeDeliveryThreshold: 299,
+  estimatedDeliveryMinutes: 45,
 });
 
 export function CartProvider({ children }) {
@@ -69,9 +72,14 @@ export function CartProvider({ children }) {
     localStorage.removeItem('cart');
   };
 
+  const FREE_DELIVERY_THRESHOLD = 299;
+  const FLAT_DISCOUNT = 5;
+  const ESTIMATED_DELIVERY_MINUTES = 45;
+
   const itemsPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const deliveryFee = itemsPrice >= 299 ? 0 : itemsPrice > 0 ? 30 : 0;
-  const totalPrice = itemsPrice + deliveryFee;
+  const deliveryFee = itemsPrice >= FREE_DELIVERY_THRESHOLD ? 0 : itemsPrice > 0 ? 30 : 0;
+  const discount = itemsPrice > 0 ? FLAT_DISCOUNT : 0;
+  const totalPrice = Math.max(itemsPrice + deliveryFee - discount, 0);
   const totalCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
@@ -85,8 +93,11 @@ export function CartProvider({ children }) {
         clearCart,
         itemsPrice,
         deliveryFee,
+        discount,
         totalPrice,
         totalCount,
+        freeDeliveryThreshold: FREE_DELIVERY_THRESHOLD,
+        estimatedDeliveryMinutes: ESTIMATED_DELIVERY_MINUTES,
       }}
     >
       {children}

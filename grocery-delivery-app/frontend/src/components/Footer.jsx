@@ -9,7 +9,7 @@ export default function Footer() {
           </p>
         </div>
         <div className="text-kraft-300">
-          <p>Mon&ndash;Sat, 7am&ndash;9pm</p>
+          <p>Open 24/7</p>
           <p>support@freshcart.example</p>
         </div>
       </div>

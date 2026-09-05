@@ -5,7 +5,18 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 export default function Cart() {
-  const { items, updateQuantity, removeItem, clearCart, itemsPrice, deliveryFee, totalPrice } = useCart();
+  const {
+    items,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    itemsPrice,
+    deliveryFee,
+    discount,
+    totalPrice,
+    freeDeliveryThreshold,
+    estimatedDeliveryMinutes,
+  } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -22,6 +33,14 @@ export default function Cart() {
 
   const handleAddressChange = (e) => {
     setAddress({ ...address, [e.target.name]: e.target.value });
+  };
+
+  const getEstimatedDeliveryWindow = () => {
+    const now = new Date();
+    const from = new Date(now.getTime() + estimatedDeliveryMinutes * 60000);
+    const to = new Date(now.getTime() + (estimatedDeliveryMinutes + 15) * 60000);
+    const fmt = (d) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+    return `${fmt(from)} - ${fmt(to)}`;
   };
 
   const handlePlaceOrder = async (e) => {
@@ -62,6 +81,7 @@ export default function Cart() {
         paymentMethod: 'Cash on Delivery (COD)',
         itemsPrice,
         deliveryFee,
+        discount,
         totalPrice,
       };
 
@@ -91,6 +111,9 @@ export default function Cart() {
       </div>
     );
   }
+
+  const amountLeftForFreeDelivery = Math.max(freeDeliveryThreshold - itemsPrice, 0);
+  const progressPercent = Math.min((itemsPrice / freeDeliveryThreshold) * 100, 100);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -165,8 +188,34 @@ export default function Cart() {
 
         {/* Address and Checkout Summary */}
         <div className="space-y-6">
+          {/* Delivery Time Estimate */}
+          <div className="bg-leaf-100 border border-leaf-700/30 rounded-2xl p-4 flex items-center gap-3">
+            <span className="text-2xl">🚴</span>
+            <div>
+              <p className="text-sm font-bold text-leaf-900">Estimated Delivery</p>
+              <p className="text-xs text-leaf-800">Today, {getEstimatedDeliveryWindow()}</p>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-kraft-300 p-6 shadow-xs">
             <h2 className="font-display font-semibold text-lg text-ink-900 mb-4">Order Summary</h2>
+
+            {/* Free Delivery Progress Banner */}
+            {amountLeftForFreeDelivery > 0 ? (
+              <div className="mb-4 p-3 bg-turmeric-100 border border-turmeric-300 rounded-lg text-sm text-ink-900">
+                🚚 Add <strong>₹{amountLeftForFreeDelivery}</strong> more for <strong>FREE delivery!</strong>
+                <div className="mt-2 h-2 bg-white rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-leaf-700 transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="mb-4 p-3 bg-leaf-100 border border-leaf-700/30 rounded-lg text-sm text-leaf-900 font-semibold">
+                🎉 You've unlocked FREE delivery!
+              </div>
+            )}
 
             <div className="space-y-2.5 text-sm text-ink-600">
               <div className="flex justify-between">
@@ -179,6 +228,12 @@ export default function Cart() {
                   {deliveryFee === 0 ? <span className="text-leaf-700 font-semibold">FREE</span> : `₹${deliveryFee}`}
                 </span>
               </div>
+              {discount > 0 && (
+                <div className="flex justify-between">
+                  <span>Discount</span>
+                  <span className="font-medium text-leaf-700">− ₹{discount}</span>
+                </div>
+              )}
               <div className="border-t border-kraft-200 pt-3 flex justify-between text-base font-bold text-ink-900">
                 <span>Total Amount</span>
                 <span className="text-leaf-700 text-xl">₹{totalPrice}</span>
