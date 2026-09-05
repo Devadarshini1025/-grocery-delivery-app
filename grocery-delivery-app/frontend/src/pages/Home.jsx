@@ -8,8 +8,17 @@ const CATEGORIES = [
   { id: 'vegetables', label: '🥦 Vegetables' },
   { id: 'dairy', label: '🥛 Dairy & Eggs' },
   { id: 'bakery', label: '🍞 Bakery' },
+  { id: 'meat', label: '🍗 Meat & Fish' },
   { id: 'beverages', label: '🧃 Beverages' },
   { id: 'snacks', label: '🥜 Snacks' },
+  { id: 'rice_atta_dals', label: '🌾 Rice, Atta & Dals' },
+  { id: 'masalas_spices', label: '🌶️ Masalas & Spices' },
+  { id: 'oils_ghee', label: '🫙 Oils & Ghee' },
+  { id: 'frozen_food', label: '🧊 Frozen Food' },
+  { id: 'cleaning', label: '🧹 Cleaning Essentials' },
+  { id: 'personal_care', label: '🧴 Personal Care' },
+  { id: 'baby_care', label: '🍼 Baby Care' },
+  { id: 'household', label: '🏠 Household' },
 ];
 
 export default function Home() {
