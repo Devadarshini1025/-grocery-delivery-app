@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Cart from './pages/Cart';
 import Orders from './pages/Orders';
+import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminRoute from './components/AdminRoute';
@@ -21,6 +22,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route
             path="/admin"

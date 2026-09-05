@@ -39,7 +39,6 @@ export default function Navbar() {
             </Link>
           )}
 
-          {/* Cart Button with Count Badge */}
           <Link
             to="/cart"
             className="relative flex items-center gap-1.5 bg-white border border-kraft-300 hover:border-leaf-500 px-3 py-1.5 rounded-lg text-ink-900 transition-colors text-sm font-medium"
@@ -54,7 +53,13 @@ export default function Navbar() {
 
           {user ? (
             <div className="flex items-center space-x-3 pl-2 border-l border-kraft-300">
-              <span className="text-sm font-medium text-leaf-900">Hi, {user.name}</span>
+              <Link
+                to="/profile"
+                className="w-8 h-8 rounded-full bg-leaf-700 text-white flex items-center justify-center text-sm font-bold hover:bg-leaf-600 transition-colors"
+                title="My Account"
+              >
+                {user.name?.charAt(0).toUpperCase()}
+              </Link>
               <button
                 onClick={handleLogout}
                 className="bg-tomato-600 hover:bg-tomato-500 text-white px-3 py-1 rounded transition-colors text-xs font-medium cursor-pointer"
