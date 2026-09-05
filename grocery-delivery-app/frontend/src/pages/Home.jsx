@@ -2,27 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import ProductCard from '../components/ProductCard';
 
-const CATEGORIES = [
-  { id: 'all', label: 'All Items', emoji: '🧺', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300' },
-  { id: 'fruits', label: 'Fruits', emoji: '🍎', image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300' },
-  { id: 'vegetables', label: 'Vegetables', emoji: '🥦', image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=300' },
-  { id: 'dairy', label: 'Dairy & Eggs', emoji: '🥛', image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300' },
-  { id: 'bakery', label: 'Bakery', emoji: '🍞', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300' },
-  { id: 'meat', label: 'Meat & Fish', emoji: '🍗', image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=300' },
-  { id: 'beverages', label: 'Beverages', emoji: '🧃', image: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=300' },
-  { id: 'snacks', label: 'Snacks', emoji: '🥜', image: 'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=300' },
-  { id: 'rice_atta_dals', label: 'Rice, Atta & Dals', emoji: '🌾', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300' },
-  { id: 'masalas_spices', label: 'Masalas & Spices', emoji: '🌶️', image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=300' },
-  { id: 'oils_ghee', label: 'Oils & Ghee', emoji: '🫙', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300' },
-  { id: 'frozen_food', label: 'Frozen Food', emoji: '🧊', image: 'https://images.unsplash.com/photo-1518843025966-a35d20f5c6d6?w=300' },
-  { id: 'cleaning', label: 'Cleaning Essentials', emoji: '🧹', image: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?w=300' },
-  { id: 'personal_care', label: 'Personal Care', emoji: '🧴', image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300' },
-  { id: 'baby_care', label: 'Baby Care', emoji: '🍼', image: 'https://images.unsplash.com/photo-1522771930-78848d9293e8?w=300' },
-  { id: 'household', label: 'Household', emoji: '🏠', image: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=300' },
-];
-
 export default function Home() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -30,8 +12,21 @@ export default function Home() {
   const productsRef = useRef(null);
 
   useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
     fetchProducts();
   }, [selectedCategory, searchTerm]);
+
+  const fetchCategories = async () => {
+    try {
+      const { data } = await api.get('/categories');
+      setCategories(data.categories || []);
+    } catch (err) {
+      console.error('Failed to load categories', err);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -57,10 +52,13 @@ export default function Home() {
     }
   };
 
-  const handleCategoryClick = (catId) => {
-    setSelectedCategory(catId);
+  const handleCategoryClick = (catSlug) => {
+    setSelectedCategory(catSlug);
     productsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const selectedCategoryLabel =
+    selectedCategory === 'all' ? 'All Products' : categories.find((c) => c.slug === selectedCategory)?.name || 'Products';
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -99,33 +97,47 @@ export default function Home() {
         )}
       </div>
 
-      {/* Category Tiles Grid (BigBasket/Zepto style) */}
-      <div className="mb-10">
-        <h2 className="font-display text-2xl font-bold text-leaf-900 mb-4">Shop by Category</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {CATEGORIES.map((cat) => (
+      {/* Category Tiles Grid — now dynamic from admin panel */}
+      {categories.length > 0 && (
+        <div className="mb-10">
+          <h2 className="font-display text-2xl font-bold text-leaf-900 mb-4">Shop by Category</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             <button
-              key={cat.id}
-              onClick={() => handleCategoryClick(cat.id)}
+              onClick={() => handleCategoryClick('all')}
               className={`group bg-white rounded-xl border overflow-hidden text-left transition-all hover:shadow-md cursor-pointer ${
-                selectedCategory === cat.id ? 'border-leaf-700 ring-2 ring-leaf-500' : 'border-kraft-300'
+                selectedCategory === 'all' ? 'border-leaf-700 ring-2 ring-leaf-500' : 'border-kraft-300'
               }`}
             >
-              <div className="h-24 overflow-hidden bg-kraft-100">
-                <img
-                  src={cat.image}
-                  alt={cat.label}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              </div>
+              <div className="h-24 flex items-center justify-center bg-leaf-100 text-4xl">🧺</div>
               <div className="p-3">
-                <p className="text-sm font-semibold text-ink-900">{cat.emoji} {cat.label}</p>
+                <p className="text-sm font-semibold text-ink-900">All Items</p>
               </div>
             </button>
-          ))}
+
+            {categories.map((cat) => (
+              <button
+                key={cat._id}
+                onClick={() => handleCategoryClick(cat.slug)}
+                className={`group bg-white rounded-xl border overflow-hidden text-left transition-all hover:shadow-md cursor-pointer ${
+                  selectedCategory === cat.slug ? 'border-leaf-700 ring-2 ring-leaf-500' : 'border-kraft-300'
+                }`}
+              >
+                <div className="h-24 overflow-hidden bg-kraft-100">
+                  <img
+                    src={cat.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300'}
+                    alt={cat.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-semibold text-ink-900">{cat.name}</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Error Alert */}
       {error && (
@@ -136,9 +148,7 @@ export default function Home() {
 
       {/* Products Grid */}
       <div ref={productsRef}>
-        <h2 className="font-display text-2xl font-bold text-leaf-900 mb-4">
-          {selectedCategory === 'all' ? 'All Products' : CATEGORIES.find((c) => c.id === selectedCategory)?.label}
-        </h2>
+        <h2 className="font-display text-2xl font-bold text-leaf-900 mb-4">{selectedCategoryLabel}</h2>
 
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
