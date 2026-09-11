@@ -1,5 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
+import AssignDeliveryPartner from '../components/admin/AssignDeliveryPartner';
 
 const PRODUCT_CATEGORIES = [
   'fruits', 'vegetables', 'dairy', 'bakery', 'meat', 'beverages', 'snacks',
@@ -29,17 +31,17 @@ export default function AdminDashboard() {
 
   const loadProducts = async () => {
     const { data } = await api.get('/products?limit=100');
-    setProducts(data.products);
+    setProducts(data.products || []);
   };
 
   const loadOrders = async () => {
     const { data } = await api.get('/orders');
-    setOrders(data.orders);
+    setOrders(data.orders || []);
   };
 
   const loadCategories = async () => {
     const { data } = await api.get('/categories');
-    setCategories(data.categories);
+    setCategories(data.categories || []);
   };
 
   useEffect(() => {
@@ -349,18 +351,30 @@ export default function AdminDashboard() {
             <div key={o._id} className="bg-white rounded-lg p-5">
               <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-kraft-200">
                 <div>
-                  <p className="font-medium">Order #{o._id.slice(-6)} &mdash; {o.user?.name}</p>
+                  <p className="font-medium">Order #{o._id.slice(-6)} &mdash; {o.user?.name || 'Guest'}</p>
                   <p className="text-sm text-ink-600">
-                    ₹{o.totalPrice.toFixed(2)} &middot; {o.paymentMethod.toUpperCase()}
+                    ₹{o.totalPrice ? o.totalPrice.toFixed(2) : '0.00'} &middot; {(o.paymentMethod || 'COD').toUpperCase()}
                   </p>
                 </div>
-                <select
-                  value={o.status}
-                  onChange={(e) => handleStatusChange(o._id, e.target.value)}
-                  className="border border-kraft-300 rounded px-3 py-1.5 text-sm"
-                >
-                  {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
-                </select>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <select
+                    value={o.status}
+                    onChange={(e) => handleStatusChange(o._id, e.target.value)}
+                    className="border border-kraft-300 rounded px-3 py-1.5 text-sm"
+                  >
+                    {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Delivery Partner Assignment Section */}
+              <div className="py-2 px-1 my-2 bg-kraft-50 rounded flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-semibold text-ink-700">Assign Driver:</span>
+                <AssignDeliveryPartner
+                  orderId={o._id}
+                  currentPartnerId={o.assignedDeliveryPartner?._id || o.assignedDeliveryPartner}
+                  onAssigned={loadOrders}
+                />
               </div>
 
               <div className="py-3 divide-y divide-kraft-100">
