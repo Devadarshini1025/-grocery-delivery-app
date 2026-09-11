@@ -1,45 +1,33 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const connectDB = require('./config/db');
-
-const authRoutes = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
-const orderRoutes = require('./routes/orderRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
-const { notFound, errorHandler } = require('./middleware/errorMiddleware');
-
-dotenv.config();
-
-// Connect to MongoDB
-connectDB();
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
+require("dotenv").config();
 
 const app = express();
-
-// Middleware
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true
-}));
 app.use(express.json());
+app.use(cors({ origin: process.env.CLIENT_URL || "*" }));
 
-// Health Check Route
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Backend is running smoothly' });
+// Register New Feature Routes
+app.use("/api/upload", require("./routes/uploadRoutes"));
+app.use("/api/support", require("./routes/supportRoutes"));
+app.use("/api/delivery", require("./routes/deliveryRoutes"));
+
+// Attach Socket.IO
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: process.env.CLIENT_URL || "*" },
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/categories', categoryRoutes);
+io.on("connection", (socket) => {
+  socket.on("join-order-room", (orderId) => {
+    socket.join(`order-${orderId}`);
+  });
 
-// Error Handling Middleware
-app.use(notFound);
-app.use(errorHandler);
+  socket.on("send-location", ({ orderId, lat, lng }) => {
+    io.to(`order-${orderId}`).emit("receive-location", { lat, lng });
+  });
+});
 
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
