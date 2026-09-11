@@ -1,65 +1,65 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-export default function AssignDeliveryPartner({ orderId, currentPartnerId, onAssigned }) {
+export default function AssignDeliveryPartner({ orderId, onAssigned }) {
   const [partners, setPartners] = useState([]);
-  const [selectedPartner, setSelectedPartner] = useState(currentPartnerId || "");
+  const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(false);
+  const token = localStorage.getItem('token');
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken") || localStorage.getItem("token");
     fetch(`${import.meta.env.VITE_API_URL}/admin/delivery-partners`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
-      .then((data) => setPartners(data))
-      .catch((err) => console.error("Error fetching partners:", err));
-  }, []);
+      .then((data) => setPartners(Array.isArray(data) ? data : []))
+      .catch((err) => console.error(err));
+  }, [token]);
 
-  const handleAssign = async () => {
-    if (!selectedPartner) return;
+  async function handleAssign() {
+    if (!selected) return;
     setLoading(true);
-
-    const token = localStorage.getItem("adminToken") || localStorage.getItem("token");
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/orders/${orderId}/assign`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ deliveryPartnerId: selectedPartner }),
-      });
-
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/admin/orders/${orderId}/assign`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ deliveryPartnerId: selected }),
+        }
+      );
       if (res.ok) {
-        if (onAssigned) onAssigned(); // Refetches orders in AdminDashboard
+        if (onAssigned) onAssigned();
       }
     } catch (err) {
-      alert("Failed to assign partner.");
-    } font-medium disabled:opacity-50 finally {
+      console.error(err);
+    } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="flex items-center gap-2 my-2">
+    <div className="flex items-center gap-2 mt-2">
       <select
-        value={selectedPartner}
-        onChange={(e) => setSelectedPartner(e.target.value)}
-        className="border rounded p-1 text-xs bg-white"
+        value={selected}
+        onChange={(e) => setSelected(e.target.value)}
+        className="text-xs border border-kraft-300 rounded px-2 py-1 bg-white text-ink-900"
       >
         <option value="">Select Delivery Partner</option>
-        {partners.map((partner) => (
-          <option key={partner._id} value={partner._id}>
-            {partner.name} ({partner.email})
+        {partners.map((p) => (
+          <option key={p._id} value={p._id}>
+            {p.name} ({p.email})
           </option>
         ))}
       </select>
       <button
         onClick={handleAssign}
-        disabled={loading || !selectedPartner}
-        className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+        disabled={!selected || loading}
+        className="bg-leaf-700 text-white text-xs px-2.5 py-1 rounded hover:bg-leaf-600 font-medium disabled:opacity-50"
       >
-        {loading ? "Assigning..." : "Assign"}
+        {loading ? 'Assigning...' : 'Assign Driver'}
       </button>
     </div>
   );
