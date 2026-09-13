@@ -2,10 +2,10 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const Order = require("../models/Order");
-const { protect, adminOnly } = require("../middleware/authMiddleware");
+const { protect, admin } = require("../middleware/authMiddleware");
 
 // 1. Get list of available delivery partners for the dropdown
-router.get("/delivery-partners", protect, adminOnly, async (req, res) => {
+router.get("/delivery-partners", protect, admin, async (req, res) => {
   try {
     const partners = await User.find({ role: "delivery" }).select("name email");
     res.json(partners);
@@ -15,7 +15,7 @@ router.get("/delivery-partners", protect, adminOnly, async (req, res) => {
 });
 
 // 2. Assign a delivery partner to a specific order
-router.put("/orders/:id/assign", protect, adminOnly, async (req, res) => {
+router.put("/orders/:id/assign", protect, admin, async (req, res) => {
   try {
     const { deliveryPartnerId } = req.body;
     const order = await Order.findByIdAndUpdate(

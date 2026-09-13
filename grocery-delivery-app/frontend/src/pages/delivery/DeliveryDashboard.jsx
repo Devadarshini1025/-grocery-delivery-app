@@ -7,35 +7,53 @@ export default function DeliveryDashboard() {
   const navigate = useNavigate();
 
   async function fetchOrders() {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/delivery/my-orders`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setOrders(await res.json());
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/delivery/my-orders`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load orders:", err);
+      setOrders([]);
+    }
   }
 
-  useEffect(() => { fetchOrders(); }, []);
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   async function updateStatus(orderId, status) {
-    await fetch(`${import.meta.env.VITE_API_URL}/delivery/orders/${orderId}/status`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ status }),
-    });
+    await fetch(
+      `${import.meta.env.VITE_API_URL}/delivery/orders/${orderId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      }
+    );
     fetchOrders();
   }
 
   return (
     <div className="max-w-2xl mx-auto mt-8 space-y-4">
       <h1 className="text-xl font-semibold">Your Deliveries</h1>
-      {orders.length === 0 && <p className="text-sm text-gray-500">No assigned orders.</p>}
+      {orders.length === 0 && (
+        <p className="text-sm text-gray-500">No assigned orders.</p>
+      )}
       {orders.map((order) => (
         <div key={order._id} className="border rounded-lg p-4 space-y-2">
           <p className="text-sm font-medium">Order #{order._id.slice(-6)}</p>
-          <p className="text-sm text-gray-600">Address: {order.deliveryAddress}</p>
-          <p className="text-sm">Status: <span className="font-medium">{order.status}</span></p>
+          <p className="text-sm text-gray-600">
+            Address: {order.deliveryAddress}
+          </p>
+          <p className="text-sm">
+            Status: <span className="font-medium">{order.status}</span>
+          </p>
           <div className="flex gap-2">
             {order.status === "confirmed" && (
               <button

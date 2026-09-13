@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const SupportTicket = require("../models/SupportTicket");
-const { protect, adminOnly } = require("../middleware/authMiddleware");
+const { protect, admin } = require("../middleware/authMiddleware");
 
 // Customer creates a ticket
 router.post("/", protect, async (req, res) => {
@@ -20,14 +20,24 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
-// Admin views all tickets
-router.get("/", protect, adminOnly, async (req, res) => {
-  const tickets = await SupportTicket.find().populate("user", "name email").sort({ createdAt: -1 });
+// Customer views their own tickets
+router.get("/my", protect, async (req, res) => {
+  const tickets = await SupportTicket.find({ user: req.user._id }).sort({
+    createdAt: -1,
+  });
   res.json(tickets);
 });
 
-// Admin updates/replies to ticket
-router.put("/:id", protect, adminOnly, async (req, res) => {
+// Admin views all tickets
+router.get("/", protect, admin, async (req, res) => {
+  const tickets = await SupportTicket.find()
+    .populate("user", "name email")
+    .sort({ createdAt: -1 });
+  res.json(tickets);
+});
+
+// Admin replies + updates status
+router.put("/:id", protect, admin, async (req, res) => {
   const { adminReply, status } = req.body;
   const ticket = await SupportTicket.findByIdAndUpdate(
     req.params.id,

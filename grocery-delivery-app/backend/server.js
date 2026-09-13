@@ -4,14 +4,26 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 require("dotenv").config();
 
+const connectDB = require("./config/db");
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: process.env.CLIENT_URL || "*" }));
 
-// Register New Feature Routes
+// Connect to MongoDB
+connectDB();
+
+// Register all routes — original app features
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/products", require("./routes/productRoutes"));
+app.use("/api/orders", require("./routes/orderRoutes"));
+app.use("/api/categories", require("./routes/categoryRoutes"));
+
+// Register new feature routes
 app.use("/api/upload", require("./routes/uploadRoutes"));
 app.use("/api/support", require("./routes/supportRoutes"));
 app.use("/api/delivery", require("./routes/deliveryRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 
 // Attach Socket.IO
 const server = http.createServer(app);
