@@ -121,7 +121,7 @@ export default function Cart() {
       },
       (error) => {
         setFetchingLocation(false);
-        alert('Could not retrieve location. Please grant permission or enter address manually.');
+        alert('Could not retrieve location. Please grant location permission in your browser.');
       }
     );
   };
