@@ -57,13 +57,13 @@ export default function DeliveryDashboard() {
           <div className="flex gap-2">
             {order.status === "confirmed" && (
               <button
-                onClick={() => updateStatus(order._id, "out-for-delivery")}
+                onClick={() => updateStatus(order._id, "out_for_delivery")}
                 className="text-xs px-3 py-1 rounded-md bg-orange-500 text-white"
               >
                 Start Delivery
               </button>
             )}
-            {order.status === "out-for-delivery" && (
+            {order.status === "out_for_delivery" && (
               <>
                 <button
                   onClick={() => navigate(`/delivery/tracking/${order._id}`)}

@@ -23,14 +23,15 @@ router.get("/my-orders", protect, deliveryOnly, async (req, res) => {
   }
 });
 
-// Update order status (out for delivery, delivered, etc.)
+// Update order status — must be one of the values in Order.js's enum:
+// 'pending' | 'confirmed' | 'preparing' | 'out_for_delivery' | 'delivered' | 'cancelled'
 router.put("/orders/:id/status", protect, deliveryOnly, async (req, res) => {
   try {
     const { status } = req.body;
     const order = await Order.findOneAndUpdate(
       { _id: req.params.id, assignedDeliveryPartner: req.user._id },
       { status },
-      { new: true }
+      { new: true, runValidators: true } // runValidators ensures invalid status strings are rejected, not silently saved
     );
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json(order);

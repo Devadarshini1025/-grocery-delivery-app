@@ -39,6 +39,14 @@ const orderSchema = new mongoose.Schema(
     isPaid: { type: Boolean, default: false },
     paidAt: { type: Date },
     deliveredAt: { type: Date },
+    assignedDeliveryPartner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    deliveryAddress: { type: String },
+    deliveryCoords: {
+      lat: Number,
+      lng: Number,
+    },
+    estimatedDeliveryTime: { type: String },
+    deliveryProofUrl: { type: String },
   },
   { timestamps: true }
 );
