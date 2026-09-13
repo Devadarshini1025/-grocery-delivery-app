@@ -3,176 +3,190 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
-import {
-  getCurrentLocation,
-  reverseGeocode,
-  calculateDistanceKm,
-  estimateDeliveryTime,
-  STORE_LOCATION,
-} from '../utils/location';
+
+// Default store location coordinates (e.g., Chennai center)
+const STORE_LOCATION = { lat: 13.0827, lng: 80.2707 };
+
+// Helper to calculate distance using Haversine formula
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Helper to estimate delivery time based on distance
+function estimateDeliveryTime(distanceKm) {
+  const baseMinutes = 15;
+  const minutesPerKm = 5;
+  const totalMinutes = Math.round(baseMinutes + distanceKm * minutesPerKm);
+
+  const now = new Date();
+  const startTime = new Date(now.getTime() + (totalMinutes - 5) * 60000);
+  const endTime = new Date(now.getTime() + (totalMinutes + 10) * 60000);
+
+  const formatTime = (date) =>
+    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  return `Today, ${formatTime(startTime)} - ${formatTime(endTime)}`;
+}
 
 export default function Cart() {
-  const {
-    items,
-    updateQuantity,
-    removeItem,
-    clearCart,
-    itemsPrice,
-    deliveryFee,
-    discount,
-    totalPrice,
-    freeDeliveryThreshold,
-    estimatedDeliveryMinutes,
-  } = useCart();
+  const { items, updateQuantity, removeFromCart, clearCart, subtotal } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const [loading, setLoading] = useState(false);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+  const [estimatedTime, setEstimatedTime] = useState('');
+  const [coords, setCoords] = useState(null);
+
   const [address, setAddress] = useState({
     street: '',
-    city: '',
-    state: 'Tamil Nadu',
-    zipCode: '',
+    city: 'Chennai',
+    postalCode: '',
     phone: '',
   });
 
-  const [coords, setCoords] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const deliveryFee = subtotal > 300 || items.length === 0 ? 0 : 30;
+  const discount = subtotal > 0 ? 5 : 0;
+  const totalAmount = Math.max(0, subtotal + deliveryFee - discount);
 
-  // On mount, check if LocationPrompt already saved a location for this user —
-  // if so, prefill the coords silently (address fields still need manual entry
-  // since Nominatim's display_name doesn't cleanly split into street/city/zip).
+  // Restore saved location & ETA on mount if present
   useEffect(() => {
-    const saved = localStorage.getItem('savedDeliveryLocation');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setCoords({ lat: parsed.lat, lng: parsed.lng });
-      } catch {
-        // ignore malformed saved data
-      }
-    }
+    const savedCoords = localStorage.getItem('deliveryCoords');
+    const savedEta = localStorage.getItem('estimatedDeliveryTime');
+    if (savedCoords) setCoords(JSON.parse(savedCoords));
+    if (savedEta) setEstimatedTime(savedEta);
   }, []);
 
-  const handleAddressChange = (e) => {
+  const handleInputChange = (e) => {
     setAddress({ ...address, [e.target.name]: e.target.value });
   };
 
-  async function handleUseCurrentLocation() {
-    setLocationError('');
-    setLocationLoading(true);
-    try {
-      const { lat, lng } = await getCurrentLocation();
-      const fullAddress = await reverseGeocode(lat, lng);
-      setCoords({ lat, lng });
-      localStorage.setItem(
-        'savedDeliveryLocation',
-        JSON.stringify({ lat, lng, address: fullAddress })
-      );
-      // Best-effort prefill — user can still edit these manually
-      setAddress((prev) => ({ ...prev, street: fullAddress }));
-    } catch (err) {
-      setLocationError(
-        "Couldn't get your location. Please enter your address manually."
-      );
-    } finally {
-      setLocationLoading(false);
-    }
-  }
-
-  // Real distance-based ETA once we have coordinates, otherwise fall back to
-  // the cart's generic estimatedDeliveryMinutes.
-  const getEstimatedDeliveryWindow = () => {
-    if (coords) {
-      const distanceKm = calculateDistanceKm(
-        STORE_LOCATION.lat,
-        STORE_LOCATION.lng,
-        coords.lat,
-        coords.lng
-      );
-      return estimateDeliveryTime(distanceKm);
+  const handleUseLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
     }
 
-    const now = new Date();
-    const from = new Date(now.getTime() + estimatedDeliveryMinutes * 60000);
-    const to = new Date(now.getTime() + (estimatedDeliveryMinutes + 15) * 60000);
-    const fmt = (d) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
-    return `Today, ${fmt(from)} - ${fmt(to)}`;
+    setFetchingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+        const userCoords = { lat: userLat, lng: userLng };
+
+        const distance = calculateDistanceKm(
+          STORE_LOCATION.lat,
+          STORE_LOCATION.lng,
+          userLat,
+          userLng
+        );
+        const eta = estimateDeliveryTime(distance);
+
+        setCoords(userCoords);
+        setEstimatedTime(eta);
+
+        // Store location & ETA in localStorage
+        localStorage.setItem('deliveryCoords', JSON.stringify(userCoords));
+        localStorage.setItem('estimatedDeliveryTime', eta);
+
+        // Reverse geocode via OpenStreetMap Nominatim
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLng}&format=json`
+          );
+          const data = await res.json();
+          if (data && data.address) {
+            setAddress((prev) => ({
+              ...prev,
+              street: data.display_name.split(',')[0] || prev.street,
+              city: data.address.city || data.address.town || data.address.suburb || prev.city,
+              postalCode: data.address.postcode || prev.postalCode,
+            }));
+          }
+        } catch (err) {
+          console.error('Reverse geocoding failed:', err);
+        } finally {
+          setFetchingLocation(false);
+        }
+      },
+      (error) => {
+        setFetchingLocation(false);
+        alert('Could not retrieve location. Please grant permission or enter address manually.');
+      }
+    );
   };
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
+
     if (!user) {
       navigate('/login');
       return;
     }
 
-    if (!items || items.length === 0) {
-      setError('Your cart is empty.');
-      return;
-    }
-
-    if (!address.street.trim() || !address.city.trim() || !address.zipCode.trim()) {
-      setError('Please fill in all address fields.');
+    if (!address.street || !address.city || !address.phone) {
+      alert('Please fill in street address, city, and phone number.');
       return;
     }
 
     try {
-      setSubmitting(true);
-      setError('');
+      setLoading(true);
 
-      const estimatedDeliveryTime = getEstimatedDeliveryWindow();
+      const savedCoords = coords || JSON.parse(localStorage.getItem('deliveryCoords'));
+      const savedEta = estimatedTime || localStorage.getItem('estimatedDeliveryTime');
 
-      const orderPayload = {
-        items: items.map((i) => ({
-          product: i.productId,
-          name: i.name,
-          quantity: i.quantity,
-          price: i.price,
-          image: i.image,
+      const orderData = {
+        items: items.map((item) => ({
+          product: item._id,
+          name: item.name,
+          qty: item.quantity,
+          price: item.price,
+          image: item.image,
         })),
-        shippingAddress: {
-          street: address.street,
-          city: address.city,
-          state: address.state,
-          zipCode: address.zipCode,
-        },
-        paymentMethod: 'Cash on Delivery (COD)',
-        itemsPrice,
-        deliveryFee,
-        discount,
-        totalPrice,
-        deliveryCoords: coords || undefined,
-        estimatedDeliveryTime,
+        shippingAddress: address,
+        itemsPrice: subtotal,
+        deliveryFee: deliveryFee,
+        discount: discount,
+        totalPrice: totalAmount,
+        deliveryCoords: savedCoords || null,
+        estimatedDeliveryTime: savedEta || '',
       };
 
-      const { data } = await api.post('/orders', orderPayload);
-      clearCart();
-      navigate('/orders', {
-        state: {
-          newOrderId: data.order?._id,
-          estimatedDeliveryTime,
-        },
-      });
+      const res = await api.post('/api/orders', orderData);
+
+      if (res.data && res.data.success) {
+        clearCart();
+        localStorage.removeItem('deliveryCoords');
+        localStorage.removeItem('estimatedDeliveryTime');
+
+        const orderId = res.data.order._id;
+        navigate(`/order-tracking/${orderId}`);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to place order. Please try again.');
-      console.error(err);
+      alert(err.response?.data?.message || 'Failed to place order. Please try again.');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  if (!items || items.length === 0) {
+  if (items.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <span className="text-6xl">🛒</span>
-        <h2 className="font-display text-3xl font-bold text-ink-900 mt-4">Your cart is empty</h2>
-        <p className="text-ink-600 mt-2">Looks like you haven't added any fresh groceries yet.</p>
+      <div className="max-w-4xl mx-auto p-6 text-center py-16">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Shopping Cart is Empty</h2>
+        <p className="text-gray-600 mb-6">Looks like you haven't added any fresh groceries yet.</p>
         <Link
           to="/"
-          className="inline-block mt-6 bg-leaf-700 hover:bg-leaf-600 text-white font-medium px-6 py-2.5 rounded-xl transition-colors"
+          className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition"
         >
           Start Shopping
         </Link>
@@ -180,73 +194,50 @@ export default function Cart() {
     );
   }
 
-  const amountLeftForFreeDelivery = Math.max(freeDeliveryThreshold - itemsPrice, 0);
-  const progressPercent = Math.min((itemsPrice / freeDeliveryThreshold) * 100, 100);
-
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      <h1 className="font-display text-3xl font-bold text-leaf-900 mb-8">Shopping Cart & Checkout</h1>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart & Checkout</h1>
 
-      {error && (
-        <div className="bg-tomato-600/10 border border-tomato-600 text-tomato-600 px-4 py-3 rounded-xl mb-6 text-sm">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Cart Items View */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Cart Items List */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white rounded-2xl border border-kraft-300 p-6 shadow-xs">
-            <h2 className="font-display font-semibold text-lg text-ink-900 mb-4">
-              Items in Cart ({items.length})
-            </h2>
-
-            <div className="divide-y divide-kraft-200">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4">Items in Cart ({items.length})</h2>
+            <div className="divide-y divide-gray-100">
               {items.map((item) => (
-                <div key={item.productId} className="py-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <img
-                      src={item.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200'}
-                      alt={item.name}
-                      className="w-16 h-16 object-cover rounded-lg border border-kraft-200"
-                    />
-                    <div>
-                      <h3 className="font-semibold text-ink-900 text-base">{item.name}</h3>
-                      <p className="text-xs text-ink-600">₹{item.price} / {item.unit || 'each'}</p>
-                    </div>
+                <div key={item._id} className="py-4 flex items-center justify-between gap-4">
+                  <img
+                    src={item.image || 'https://via.placeholder.com/80'}
+                    alt={item.name}
+                    className="w-16 h-16 object-cover rounded-lg"
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-800">{item.name}</h3>
+                    <p className="text-sm text-gray-500">₹{item.price} / unit</p>
                   </div>
-
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center border border-kraft-300 rounded-lg overflow-hidden bg-kraft-100">
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                        className="px-2.5 py-1 text-ink-900 hover:bg-kraft-200 font-bold transition-colors cursor-pointer"
-                      >
-                        −
-                      </button>
-                      <span className="px-3 py-1 font-semibold text-sm bg-white min-w-8 text-center">
-                        {item.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                        className="px-2.5 py-1 text-ink-900 hover:bg-kraft-200 font-bold transition-colors cursor-pointer"
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    <div className="text-right min-w-20">
-                      <p className="font-bold text-ink-900">₹{item.price * item.quantity}</p>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.productId)}
-                        className="text-xs text-tomato-600 hover:underline cursor-pointer"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                      className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold"
+                    >
+                      -
+                    </button>
+                    <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                      className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900">₹{item.price * item.quantity}</p>
+                    <button
+                      onClick={() => removeFromCart(item._id)}
+                      className="text-xs text-red-500 hover:underline mt-1"
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
               ))}
@@ -254,150 +245,130 @@ export default function Cart() {
           </div>
         </div>
 
-        {/* Address and Checkout Summary */}
+        {/* Checkout Summary & Delivery Address */}
         <div className="space-y-6">
-          {/* Delivery Time Estimate */}
-          <div className="bg-leaf-100 border border-leaf-700/30 rounded-2xl p-4 flex items-center gap-3">
-            <span className="text-2xl">🚴</span>
-            <div>
-              <p className="text-sm font-bold text-leaf-900">Estimated Delivery</p>
-              <p className="text-xs text-leaf-800">{getEstimatedDeliveryWindow()}</p>
-              {!coords && (
-                <p className="text-xs text-leaf-700 mt-1">
-                  (Based on default estimate — use your location below for an accurate time)
+          {/* Estimated Delivery Badge */}
+          {estimatedTime && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center space-x-3">
+              <span className="text-2xl">🚴</span>
+              <div>
+                <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wide">
+                  Estimated Delivery
                 </p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-kraft-300 p-6 shadow-xs">
-            <h2 className="font-display font-semibold text-lg text-ink-900 mb-4">Order Summary</h2>
-
-            {/* Free Delivery Progress Banner */}
-            {amountLeftForFreeDelivery > 0 ? (
-              <div className="mb-4 p-3 bg-turmeric-100 border border-turmeric-300 rounded-lg text-sm text-ink-900">
-                🚚 Add <strong>₹{amountLeftForFreeDelivery}</strong> more for <strong>FREE delivery!</strong>
-                <div className="mt-2 h-2 bg-white rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-leaf-700 transition-all"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
+                <p className="text-sm font-bold text-emerald-950">{estimatedTime}</p>
               </div>
-            ) : (
-              <div className="mb-4 p-3 bg-leaf-100 border border-leaf-700/30 rounded-lg text-sm text-leaf-900 font-semibold">
-                🎉 You've unlocked FREE delivery!
+            </div>
+          )}
+
+          {/* Order Summary */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
+
+            {subtotal < 300 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 mb-4">
+                Add <strong>₹{300 - subtotal}</strong> more for <strong>FREE delivery!</strong>
               </div>
             )}
 
-            <div className="space-y-2.5 text-sm text-ink-600">
+            <div className="space-y-2 text-sm text-gray-600 mb-4">
               <div className="flex justify-between">
                 <span>Items Subtotal</span>
-                <span className="font-medium text-ink-900">₹{itemsPrice}</span>
+                <span>₹{subtotal}</span>
               </div>
               <div className="flex justify-between">
                 <span>Delivery Fee</span>
-                <span className="font-medium text-ink-900">
-                  {deliveryFee === 0 ? <span className="text-leaf-700 font-semibold">FREE</span> : `₹${deliveryFee}`}
-                </span>
+                <span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span>
               </div>
-              {discount > 0 && (
-                <div className="flex justify-between">
-                  <span>Discount</span>
-                  <span className="font-medium text-leaf-700">− ₹{discount}</span>
-                </div>
-              )}
-              <div className="border-t border-kraft-200 pt-3 flex justify-between text-base font-bold text-ink-900">
-                <span>Total Amount</span>
-                <span className="text-leaf-700 text-xl">₹{totalPrice}</span>
+              <div className="flex justify-between text-emerald-600">
+                <span>Discount</span>
+                <span>-₹{discount}</span>
               </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-3 flex justify-between font-bold text-lg text-gray-900">
+              <span>Total Amount</span>
+              <span>₹{totalAmount}</span>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-kraft-300 p-6 shadow-xs">
-            <h2 className="font-display font-semibold text-lg text-ink-900 mb-4">Delivery Address</h2>
+          {/* Delivery Address Form */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Delivery Address</h2>
+              <button
+                type="button"
+                onClick={handleUseLocation}
+                disabled={fetchingLocation}
+                className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-emerald-200 transition"
+              >
+                {fetchingLocation ? 'Fetching...' : '📍 Use my current location'}
+              </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={handleUseCurrentLocation}
-              disabled={locationLoading}
-              className="w-full mb-4 px-4 py-2 rounded-lg border border-leaf-700 text-leaf-700 text-sm font-medium hover:bg-leaf-50 disabled:opacity-60"
-            >
-              {locationLoading ? 'Detecting location...' : '📍 Use my current location'}
-            </button>
-            {locationError && (
-              <p className="text-xs text-tomato-600 mb-3">{locationError}</p>
-            )}
-
-            <form onSubmit={handlePlaceOrder} className="space-y-3 text-sm">
+            <form onSubmit={handlePlaceOrder} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-ink-600 mb-1">Street Address</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Street Address
+                </label>
                 <input
                   type="text"
                   name="street"
                   required
-                  placeholder="Flat 4B, Green Valley Apts"
                   value={address.street}
-                  onChange={handleAddressChange}
-                  className="w-full px-3 py-2 border border-kraft-300 rounded-lg focus:ring-2 focus:ring-leaf-500 focus:outline-none"
+                  onChange={handleInputChange}
+                  placeholder="Flat 4B, Green Valley Apts"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-ink-600 mb-1">City</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
                   <input
                     type="text"
                     name="city"
                     required
-                    placeholder="Chennai"
                     value={address.city}
-                    onChange={handleAddressChange}
-                    className="w-full px-3 py-2 border border-kraft-300 rounded-lg focus:ring-2 focus:ring-leaf-500 focus:outline-none"
+                    onChange={handleInputChange}
+                    placeholder="Chennai"
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-ink-600 mb-1">PIN Code</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">PIN Code</label>
                   <input
                     type="text"
-                    name="zipCode"
-                    required
+                    name="postalCode"
+                    value={address.postalCode}
+                    onChange={handleInputChange}
                     placeholder="600001"
-                    value={address.zipCode}
-                    onChange={handleAddressChange}
-                    className="w-full px-3 py-2 border border-kraft-300 rounded-lg focus:ring-2 focus:ring-leaf-500 focus:outline-none"
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-ink-600 mb-1">Contact Phone</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Contact Phone
+                </label>
                 <input
                   type="tel"
                   name="phone"
-                  placeholder="9876543210"
+                  required
                   value={address.phone}
-                  onChange={handleAddressChange}
-                  className="w-full px-3 py-2 border border-kraft-300 rounded-lg focus:ring-2 focus:ring-leaf-500 focus:outline-none"
+                  onChange={handleInputChange}
+                  placeholder="9876543210"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
-              {user ? (
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full mt-4 bg-tomato-600 hover:bg-tomato-500 text-white font-bold py-3 rounded-xl transition-colors shadow-sm disabled:opacity-50 cursor-pointer text-base"
-                >
-                  {submitting ? 'Placing Order...' : `Place Order (COD) • ₹${totalPrice}`}
-                </button>
-              ) : (
-                <Link
-                  to="/login"
-                  className="block w-full text-center mt-4 bg-leaf-700 hover:bg-leaf-600 text-white font-bold py-3 rounded-xl transition-colors"
-                >
-                  Log In to Place Order
-                </Link>
-              )}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-4 bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {loading ? 'Processing Order...' : `Place Order (COD) • ₹${totalAmount}`}
+              </button>
             </form>
           </div>
         </div>
