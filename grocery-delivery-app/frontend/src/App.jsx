@@ -11,13 +11,15 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminRoute from './components/AdminRoute';
 
-// New Feature Imports
+// Delivery & Feature Imports
 import Support from "./pages/Support";
 import DeliveryLogin from "./pages/delivery/DeliveryLogin";
 import DeliveryDashboard from "./pages/delivery/DeliveryDashboard";
 import DeliveryTracking from "./pages/delivery/DeliveryTracking";
 import OrderTracking from "./pages/OrderTracking";
 import DeliveryHeader from "./components/delivery/DeliveryHeader";
+import DeliveryRoute from "./components/delivery/DeliveryRoute";
+import LocationPrompt from "./components/LocationPrompt";
 
 function DeliveryTrackingWrapper() {
   const { orderId } = useParams();
@@ -35,6 +37,7 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <LocationPrompt />
       {isDeliveryRoute ? <DeliveryHeader /> : <Navbar />}
       <main className="flex-1">
         <Routes>
@@ -46,13 +49,30 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin/login" element={<AdminLogin />} />
 
-          {/* New Feature Routes */}
+          {/* Customer Support & Tracking Routes */}
           <Route path="/support" element={<Support />} />
-          <Route path="/delivery/login" element={<DeliveryLogin />} />
-          <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
-          <Route path="/delivery/tracking/:orderId" element={<DeliveryTrackingWrapper />} />
           <Route path="/order-tracking/:orderId" element={<OrderTrackingWrapper />} />
 
+          {/* Delivery Partner Routes */}
+          <Route path="/delivery/login" element={<DeliveryLogin />} />
+          <Route
+            path="/delivery/dashboard"
+            element={
+              <DeliveryRoute>
+                <DeliveryDashboard />
+              </DeliveryRoute>
+            }
+          />
+          <Route
+            path="/delivery/tracking/:orderId"
+            element={
+              <DeliveryRoute>
+                <DeliveryTrackingWrapper />
+              </DeliveryRoute>
+            }
+          />
+
+          {/* Admin Routes */}
           <Route
             path="/admin"
             element={

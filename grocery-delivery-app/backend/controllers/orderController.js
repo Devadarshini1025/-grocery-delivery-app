@@ -14,6 +14,8 @@ const createOrder = async (req, res, next) => {
       shippingPrice = 0,
       discount = 0,
       totalPrice = 0,
+      deliveryCoords,
+      estimatedDeliveryTime,
     } = req.body;
 
     const finalItems = items || orderItems;
@@ -38,6 +40,8 @@ const createOrder = async (req, res, next) => {
       isPaid: false, // Collected in cash upon delivery
       paidAt: null,
       status: 'pending',
+      deliveryCoords,
+      estimatedDeliveryTime,
     });
 
     const createdOrder = await order.save();

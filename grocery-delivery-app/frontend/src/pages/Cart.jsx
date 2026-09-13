@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
+import {
+  getCurrentLocation,
+  reverseGeocode,
+  calculateDistanceKm,
+  estimateDeliveryTime,
+  STORE_LOCATION,
+} from '../utils/location';
 
 export default function Cart() {
   const {
@@ -28,19 +35,71 @@ export default function Cart() {
     phone: '',
   });
 
+  const [coords, setCoords] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // On mount, check if LocationPrompt already saved a location for this user —
+  // if so, prefill the coords silently (address fields still need manual entry
+  // since Nominatim's display_name doesn't cleanly split into street/city/zip).
+  useEffect(() => {
+    const saved = localStorage.getItem('savedDeliveryLocation');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setCoords({ lat: parsed.lat, lng: parsed.lng });
+      } catch {
+        // ignore malformed saved data
+      }
+    }
+  }, []);
 
   const handleAddressChange = (e) => {
     setAddress({ ...address, [e.target.name]: e.target.value });
   };
 
+  async function handleUseCurrentLocation() {
+    setLocationError('');
+    setLocationLoading(true);
+    try {
+      const { lat, lng } = await getCurrentLocation();
+      const fullAddress = await reverseGeocode(lat, lng);
+      setCoords({ lat, lng });
+      localStorage.setItem(
+        'savedDeliveryLocation',
+        JSON.stringify({ lat, lng, address: fullAddress })
+      );
+      // Best-effort prefill — user can still edit these manually
+      setAddress((prev) => ({ ...prev, street: fullAddress }));
+    } catch (err) {
+      setLocationError(
+        "Couldn't get your location. Please enter your address manually."
+      );
+    } finally {
+      setLocationLoading(false);
+    }
+  }
+
+  // Real distance-based ETA once we have coordinates, otherwise fall back to
+  // the cart's generic estimatedDeliveryMinutes.
   const getEstimatedDeliveryWindow = () => {
+    if (coords) {
+      const distanceKm = calculateDistanceKm(
+        STORE_LOCATION.lat,
+        STORE_LOCATION.lng,
+        coords.lat,
+        coords.lng
+      );
+      return estimateDeliveryTime(distanceKm);
+    }
+
     const now = new Date();
     const from = new Date(now.getTime() + estimatedDeliveryMinutes * 60000);
     const to = new Date(now.getTime() + (estimatedDeliveryMinutes + 15) * 60000);
     const fmt = (d) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
-    return `${fmt(from)} - ${fmt(to)}`;
+    return `Today, ${fmt(from)} - ${fmt(to)}`;
   };
 
   const handlePlaceOrder = async (e) => {
@@ -64,6 +123,8 @@ export default function Cart() {
       setSubmitting(true);
       setError('');
 
+      const estimatedDeliveryTime = getEstimatedDeliveryWindow();
+
       const orderPayload = {
         items: items.map((i) => ({
           product: i.productId,
@@ -83,11 +144,18 @@ export default function Cart() {
         deliveryFee,
         discount,
         totalPrice,
+        deliveryCoords: coords || undefined,
+        estimatedDeliveryTime,
       };
 
       const { data } = await api.post('/orders', orderPayload);
       clearCart();
-      navigate('/orders', { state: { newOrderId: data.order?._id } });
+      navigate('/orders', {
+        state: {
+          newOrderId: data.order?._id,
+          estimatedDeliveryTime,
+        },
+      });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to place order. Please try again.');
       console.error(err);
@@ -193,7 +261,12 @@ export default function Cart() {
             <span className="text-2xl">🚴</span>
             <div>
               <p className="text-sm font-bold text-leaf-900">Estimated Delivery</p>
-              <p className="text-xs text-leaf-800">Today, {getEstimatedDeliveryWindow()}</p>
+              <p className="text-xs text-leaf-800">{getEstimatedDeliveryWindow()}</p>
+              {!coords && (
+                <p className="text-xs text-leaf-700 mt-1">
+                  (Based on default estimate — use your location below for an accurate time)
+                </p>
+              )}
             </div>
           </div>
 
@@ -243,6 +316,18 @@ export default function Cart() {
 
           <div className="bg-white rounded-2xl border border-kraft-300 p-6 shadow-xs">
             <h2 className="font-display font-semibold text-lg text-ink-900 mb-4">Delivery Address</h2>
+
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={locationLoading}
+              className="w-full mb-4 px-4 py-2 rounded-lg border border-leaf-700 text-leaf-700 text-sm font-medium hover:bg-leaf-50 disabled:opacity-60"
+            >
+              {locationLoading ? 'Detecting location...' : '📍 Use my current location'}
+            </button>
+            {locationError && (
+              <p className="text-xs text-tomato-600 mb-3">{locationError}</p>
+            )}
 
             <form onSubmit={handlePlaceOrder} className="space-y-3 text-sm">
               <div>

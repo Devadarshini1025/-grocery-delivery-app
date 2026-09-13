@@ -1,4 +1,3 @@
-// Gets browser GPS coordinates
 export function getCurrentLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -18,19 +17,15 @@ export function getCurrentLocation() {
   });
 }
 
-// Converts lat/lng into a readable address using Nominatim (Free reverse geocoding)
 export async function reverseGeocode(lat, lng) {
   const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-  const res = await fetch(url, {
-    headers: { "Accept-Language": "en" },
-  });
+  const res = await fetch(url, { headers: { "Accept-Language": "en" } });
   const data = await res.json();
   return data.display_name || "Address not found";
 }
 
-// Haversine formula — distance in km between two lat/lng coordinates
 export function calculateDistanceKm(lat1, lng1, lat2, lng2) {
-  const R = 6371; // Earth's radius in km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
@@ -42,10 +37,11 @@ export function calculateDistanceKm(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
-// Simple ETA calculation based on distance
 export function estimateDeliveryTime(distanceKm) {
   if (distanceKm <= 2) return "20–30 mins";
   if (distanceKm <= 5) return "30–45 mins";
   if (distanceKm <= 10) return "45–60 mins";
   return "60–90 mins";
 }
+
+export const STORE_LOCATION = { lat: 13.0827, lng: 80.2707 }; // set to your real store coords
