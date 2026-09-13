@@ -1,4 +1,4 @@
-import { Routes, Route, useParams } from 'react-router-dom';
+import { Routes, Route, useParams, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -17,8 +17,8 @@ import DeliveryLogin from "./pages/delivery/DeliveryLogin";
 import DeliveryDashboard from "./pages/delivery/DeliveryDashboard";
 import DeliveryTracking from "./pages/delivery/DeliveryTracking";
 import OrderTracking from "./pages/OrderTracking";
+import DeliveryHeader from "./components/delivery/DeliveryHeader";
 
-// ⬇️ PASTE THE WRAPPERS HERE (Above function App) ⬇️
 function DeliveryTrackingWrapper() {
   const { orderId } = useParams();
   return <DeliveryTracking orderId={orderId} />;
@@ -30,9 +30,12 @@ function OrderTrackingWrapper() {
 }
 
 function App() {
+  const location = useLocation();
+  const isDeliveryRoute = location.pathname.startsWith("/delivery");
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      {isDeliveryRoute ? <DeliveryHeader /> : <Navbar />}
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
@@ -60,7 +63,7 @@ function App() {
           />
         </Routes>
       </main>
-      <Footer />
+      {!isDeliveryRoute && <Footer />}
     </div>
   );
 }
