@@ -142,14 +142,14 @@ export default function Cart() {
     try {
       setLoading(true);
 
-      const savedCoords = coords || JSON.parse(localStorage.getItem('deliveryCoords'));
+      const savedCoords = coords || JSON.parse(localStorage.getItem('deliveryCoords') || 'null');
       const savedEta = estimatedTime || localStorage.getItem('estimatedDeliveryTime');
 
       const orderData = {
         items: items.map((item) => ({
           product: item._id,
           name: item.name,
-          qty: item.quantity,
+          quantity: item.quantity,
           price: item.price,
           image: item.image,
         })),
@@ -162,7 +162,7 @@ export default function Cart() {
         estimatedDeliveryTime: savedEta || '',
       };
 
-      const res = await api.post('/api/orders', orderData);
+      const res = await api.post('/orders', orderData);
 
       if (res.data && res.data.success) {
         clearCart();
